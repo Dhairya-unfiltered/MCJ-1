@@ -8,11 +8,14 @@ export default function Navbar() {
   };
 
   return (
-    <div className="bg-black text-white p-4 flex gap-6">
-      <Link to="/purchase">Purchase</Link>
+    <div className="bg-black text-white p-4 flex gap-6 justify-between">
+      <div className="flex gap-3">
+           <Link to="/purchase">Purchase</Link>
       <Link to="/sell">Sell</Link>
       <Link to="/other">Other</Link>
-      <button onClick={logout}>Logout</button>
+      </div>
+    
+      <button className="text-red-500" onClick={logout}>Logout</button>
     </div>
   );
 }
