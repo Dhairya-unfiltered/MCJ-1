@@ -5,7 +5,12 @@ import toast from "react-hot-toast";
 
 export default function Other() {
   const [expenses, setExpenses] = useState([]);
-  const [form, setForm] = useState({});
+
+  const [form, setForm] = useState({
+    type: "",
+    amount: "",
+    gst: ""
+  });
 
   const [deleteId, setDeleteId] = useState(null);
   const [confirmText, setConfirmText] = useState("");
@@ -56,12 +61,12 @@ export default function Other() {
   // ---------- ADD ----------
   const addExpense = async () => {
     try {
-      if (!form.type || !form.amount) {
+      if (!form.type || form.amount === "") {
         toast.error("Fill all fields");
         return;
       }
 
-      const gst = form.gst ? Number(form.gst) : 0;
+      const gst = form.gst === "" ? 0 : Number(form.gst);
 
       const { error } = await supabase.from("expenses").insert({
         type: form.type,
@@ -72,7 +77,14 @@ export default function Other() {
       if (error) throw error;
 
       toast.success("Expense Added");
-      setForm({});
+
+      // RESET FORM
+      setForm({
+        type: "",
+        amount: "",
+        gst: ""
+      });
+
       fetchExpenses();
     } catch (err) {
       toast.error(err.message || "Error adding expense");
@@ -94,46 +106,49 @@ export default function Other() {
     <>
       <Navbar />
       <div className="p-4 md:p-6 max-w-4xl mx-auto flex flex-col gap-6">
- 
- <div className="border p-4 rounded shadow bg-white flex flex-col gap-4">
-        <h2 className="text-xl font-bold">Misc Expenses</h2>
 
-{/* FORM */}
-        <input
-          className="border p-2"
-          placeholder="Expense Type"
-          onChange={(e) => setForm({ ...form, type: e.target.value })}
-        />
+        <div className="border p-4 rounded shadow bg-white flex flex-col gap-4">
+          <h2 className="text-xl font-bold">Misc Expenses</h2>
 
-        <input
-          className="border p-2"
-          type="number"
-          placeholder="Amount"
-          onChange={(e) =>
-            setForm({ ...form, amount: Number(e.target.value) })
-          }
-        />
+          {/* FORM */}
+          <input
+            className="border p-2"
+            placeholder="Expense Type"
+            value={form.type}
+            onChange={(e) => setForm({ ...form, type: e.target.value })}
+          />
 
-        <input
-          className="border p-2"
-          type="number"
-          placeholder="GST (optional)"
-          onChange={(e) => setForm({ ...form, gst: Number(e.target.value) })}
-        />
+          <input
+            className="border p-2"
+            type="number"
+            placeholder="Amount"
+            value={form.amount}
+            onChange={(e) =>
+              setForm({ ...form, amount: e.target.value })
+            }
+          />
 
-        <button
-          className="bg-green-600 text-white p-2 rounded"
-          onClick={addExpense}
-        >
-          Add Expense
-        </button>
-    </div>
+          <input
+            className="border p-2"
+            type="number"
+            placeholder="GST (optional)"
+            value={form.gst}
+            onChange={(e) =>
+              setForm({ ...form, gst: e.target.value })
+            }
+          />
 
-
+          <button
+            className="bg-green-600 text-white p-2 rounded"
+            onClick={addExpense}
+          >
+            Add Expense
+          </button>
+        </div>
 
         <h3 className="mt-6 font-semibold">Expenses</h3>
-        
-          {/* MONTH + YEAR FILTER */}
+
+        {/* MONTH + YEAR FILTER */}
         <div className="flex gap-3">
           <select
             className="border p-2"
@@ -189,10 +204,9 @@ export default function Other() {
               className="bg-red-600 text-white px-4 py-2 rounded w-full"
               onClick={deleteExpense}
             >
-             Confirm Delete
+              Confirm Delete
             </button>
           </div>
-          
         </div>
       )}
     </>
