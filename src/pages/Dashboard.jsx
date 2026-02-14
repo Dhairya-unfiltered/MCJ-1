@@ -12,10 +12,27 @@ const formatCurrency = (amount) => {
     }).format(amount);
 };
 
+// Helper to get UTC ISO string from local YYYY-MM-DD that represents IST start/end
+const getISTDateISO = (dateStr, isEndOfDay = false) => {
+    if (!dateStr) return null;
+    const [y, m, d] = dateStr.split("-").map(Number);
+    let hour = isEndOfDay ? 23 : 0;
+    let minute = isEndOfDay ? 59 : 0;
+    let second = isEndOfDay ? 59 : 0;
+    let ms = isEndOfDay ? 999 : 0;
+    const utcBase = Date.UTC(y, m - 1, d, hour, minute, second, ms);
+    const istOffsetMs = 5.5 * 60 * 60 * 1000;
+    const trueUtc = new Date(utcBase - istOffsetMs);
+    return trueUtc.toISOString();
+};
+
 export default function Dashboard() {
     const today = new Date();
+    const [filterType, setFilterType] = useState("month"); // 'month' | 'custom'
     const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
     const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+    const [customStart, setCustomStart] = useState(today.toISOString().split("T")[0]);
+    const [customEnd, setCustomEnd] = useState(today.toISOString().split("T")[0]);
     const [loading, setLoading] = useState(true);
 
     const [stats, setStats] = useState({
@@ -32,22 +49,29 @@ export default function Dashboard() {
 
     useEffect(() => {
         fetchDashboardData();
-    }, [selectedMonth, selectedYear]);
+    }, [selectedMonth, selectedYear, filterType, customStart, customEnd]);
 
     const fetchDashboardData = async () => {
         setLoading(true);
         try {
             // 1. Calculate IST Date Range
-            const IST_OFFSET_HOURS = 5.5;
-            const startUTC = new Date(
-                Date.UTC(selectedYear, selectedMonth, 1, 0, 0, 0) -
-                IST_OFFSET_HOURS * 60 * 60 * 1000
-            ).toISOString();
+            let startUTC, endUTC;
 
-            const endUTC = new Date(
-                Date.UTC(selectedYear, selectedMonth + 1, 1, 0, 0, 0) -
-                IST_OFFSET_HOURS * 60 * 60 * 1000
-            ).toISOString();
+            if (filterType === 'month') {
+                const IST_OFFSET_HOURS = 5.5;
+                startUTC = new Date(
+                    Date.UTC(selectedYear, selectedMonth, 1, 0, 0, 0) -
+                    IST_OFFSET_HOURS * 60 * 60 * 1000
+                ).toISOString();
+
+                endUTC = new Date(
+                    Date.UTC(selectedYear, selectedMonth + 1, 1, 0, 0, 0) -
+                    IST_OFFSET_HOURS * 60 * 60 * 1000
+                ).toISOString();
+            } else {
+                startUTC = getISTDateISO(customStart, false);
+                endUTC = getISTDateISO(customEnd, true);
+            }
 
             // 2. Fetch Data in Parallel
             const [sellRes, purchaseRes, expenseRes] = await Promise.all([
@@ -133,34 +157,73 @@ export default function Dashboard() {
                 <div className="max-w-7xl mx-auto p-4 md:p-8">
 
                     {/* Header */}
-                    <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
                         <div>
                             <h1 className="text-3xl font-bold text-gray-900">Dashboard Overview</h1>
-                            <p className="text-gray-500 mt-1">Financial summary for {months[selectedMonth]} {selectedYear}</p>
+                            <div className="flex items-center gap-4 mt-2">
+                                {/* Filter Type Toggle */}
+                                <div className="flex bg-gray-200 p-1 rounded-lg">
+                                    <button
+                                        onClick={() => setFilterType('month')}
+                                        className={`px-3 py-1 rounded-md text-sm font-bold transition ${filterType === 'month' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}
+                                    >
+                                        Monthly
+                                    </button>
+                                    <button
+                                        onClick={() => setFilterType('custom')}
+                                        className={`px-3 py-1 rounded-md text-sm font-bold transition ${filterType === 'custom' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}
+                                    >
+                                        Custom Range
+                                    </button>
+                                </div>
+                                <p className="text-gray-500 text-sm hidden sm:block">
+                                    {filterType === 'month' ? `Summary for ${months[selectedMonth]} ${selectedYear}` : "Values for selected range"}
+                                </p>
+                            </div>
                         </div>
 
                         <div className="flex bg-white p-1.5 rounded-xl shadow-sm border border-gray-200">
-                            <div className="relative group">
-                                <select
-                                    className="appearance-none bg-transparent pl-4 pr-8 py-2 text-gray-700 font-bold cursor-pointer outline-none focus:text-yellow-600 transition"
-                                    value={selectedMonth}
-                                    onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                                >
-                                    {months.map((m, i) => <option key={i} value={i}>{m}</option>)}
-                                </select>
-                                <Calendar size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                            </div>
-                            <div className="w-px bg-gray-200 my-1"></div>
-                            <div className="relative group">
-                                <select
-                                    className="appearance-none bg-transparent pl-4 pr-8 py-2 text-gray-700 font-bold cursor-pointer outline-none focus:text-yellow-600 transition"
-                                    value={selectedYear}
-                                    onChange={(e) => setSelectedYear(Number(e.target.value))}
-                                >
-                                    {years.map((y) => <option key={y} value={y}>{y}</option>)}
-                                </select>
-                                <Calendar size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                            </div>
+                            {filterType === 'month' ? (
+                                <>
+                                    <div className="relative group">
+                                        <select
+                                            className="appearance-none bg-transparent pl-4 pr-8 py-2 text-gray-700 font-bold cursor-pointer outline-none focus:text-yellow-600 transition"
+                                            value={selectedMonth}
+                                            onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                                        >
+                                            {months.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                                        </select>
+                                        <Calendar size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                    </div>
+                                    <div className="w-px bg-gray-200 my-1"></div>
+                                    <div className="relative group">
+                                        <select
+                                            className="appearance-none bg-transparent pl-4 pr-8 py-2 text-gray-700 font-bold cursor-pointer outline-none focus:text-yellow-600 transition"
+                                            value={selectedYear}
+                                            onChange={(e) => setSelectedYear(Number(e.target.value))}
+                                        >
+                                            {years.map((y) => <option key={y} value={y}>{y}</option>)}
+                                        </select>
+                                        <Calendar size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="flex flex-wrap gap-2 text-sm items-center px-2">
+                                    <input
+                                        type="date"
+                                        className="border-none bg-transparent font-bold text-gray-700 outline-none focus:text-yellow-600"
+                                        value={customStart}
+                                        onChange={(e) => setCustomStart(e.target.value)}
+                                    />
+                                    <span className="text-gray-300">|</span>
+                                    <input
+                                        type="date"
+                                        className="border-none bg-transparent font-bold text-gray-700 outline-none focus:text-yellow-600"
+                                        value={customEnd}
+                                        onChange={(e) => setCustomEnd(e.target.value)}
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
 
