@@ -3,15 +3,7 @@ import supabase from "../services/supabase";
 import Navbar from "../components/Navbar";
 import toast from "react-hot-toast";
 import { Trash2, Printer, X, ShoppingCart, Plus, Search, Calendar, FileText, ChevronRight } from "lucide-react";
-
-// Utility to format currency
-const formatCurrency = (amount) => {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(amount);
-};
+import { safeMultiply, safeAdd, calculateGST, formatCurrency } from "../utils/finance";
 
 // Utility to format date to IST (Robust)
 const formatIST = (dateString) => {
@@ -81,9 +73,10 @@ export default function Purchase() {
   const [confirmText, setConfirmText] = useState("");
 
   // Calculations
-  const subtotal = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-  const gstAmount = subtotal * 0.03;
-  const grandTotal = Math.round(subtotal + gstAmount);
+  // Calculations
+  const subtotal = items.reduce((sum, item) => safeAdd(sum, item.amount), 0);
+  const gstAmount = calculateGST(subtotal);
+  const grandTotal = safeAdd(subtotal, gstAmount);
 
   // ---------- FETCH BILLS ----------
   const fetchBills = async () => {
@@ -159,7 +152,7 @@ export default function Purchase() {
     if (field === "rate" || field === "weight") {
       const rate = Number(newItems[index].rate) || 0;
       const weight = Number(newItems[index].weight) || 0;
-      newItems[index].amount = Math.round(rate * weight);
+      newItems[index].amount = safeMultiply(rate, weight);
     }
 
     setItems(newItems);

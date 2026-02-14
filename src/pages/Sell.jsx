@@ -2,15 +2,9 @@ import { useEffect, useState } from "react";
 import supabase from "../services/supabase";
 import Navbar from "../components/Navbar";
 import { Trash2, Printer, X, Sparkles, Plus, Search, Calendar, FileText, ChevronRight } from "lucide-react";
+import { safeMultiply, safeAdd, calculateGST, formatCurrency } from "../utils/finance";
 
-// Utility to format currency
-const formatCurrency = (amount) => {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(amount);
-};
+// Utility to format date to IST
 
 // Utility to format date to IST
 const formatIST = (dateString) => {
@@ -112,16 +106,16 @@ export default function Sell() {
     if (field === "rate" || field === "weight") {
       const rate = parseFloat(newItems[index].rate) || 0;
       const weight = parseFloat(newItems[index].weight) || 0;
-      newItems[index].amount = rate * weight;
+      newItems[index].amount = safeMultiply(rate, weight);
     }
 
     setItems(newItems);
   };
 
   const calculateTotals = () => {
-    const subtotal = items.reduce((acc, item) => acc + (item.amount || 0), 0);
-    const gst = subtotal * 0.03; // 3% GST
-    const total = subtotal + gst;
+    const subtotal = items.reduce((acc, item) => safeAdd(acc, item.amount), 0);
+    const gst = calculateGST(subtotal); // 3% GST
+    const total = safeAdd(subtotal, gst);
     return { subtotal, gst, total };
   };
 

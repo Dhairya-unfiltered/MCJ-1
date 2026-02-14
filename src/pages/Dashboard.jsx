@@ -2,15 +2,7 @@ import { useEffect, useState } from "react";
 import supabase from "../services/supabase";
 import Navbar from "../components/Navbar";
 import { IndianRupee, ShoppingCart, TrendingDown, Calendar, ArrowUpRight, ArrowDownRight, Wallet } from "lucide-react";
-
-// Utility to format currency
-const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0, // No decimals for cleaner dashboard
-    }).format(amount);
-};
+import { safeAdd, safeSubtract, formatCurrency } from "../utils/finance";
 
 // Helper to get UTC ISO string from local YYYY-MM-DD that represents IST start/end
 const getISTDateISO = (dateStr, isEndOfDay = false) => {
@@ -75,9 +67,9 @@ export default function Dashboard() {
 
             // 2. Fetch Data in Parallel
             const [sellRes, purchaseRes, expenseRes] = await Promise.all([
-                supabase.from("sell_bills").select("*").gte("created_at", startUTC).lt("created_at", endUTC),
-                supabase.from("purchase_bills").select("*").gte("created_at", startUTC).lt("created_at", endUTC),
-                supabase.from("expenses").select("*").gte("created_at", startUTC).lt("created_at", endUTC),
+                supabase.from("sell_bills").select("total, gst, created_at").gte("created_at", startUTC).lt("created_at", endUTC),
+                supabase.from("purchase_bills").select("total, gst, created_at").gte("created_at", startUTC).lt("created_at", endUTC),
+                supabase.from("expenses").select("amount, gst, created_at").gte("created_at", startUTC).lt("created_at", endUTC),
             ]);
 
             if (sellRes.error) throw sellRes.error;
@@ -85,25 +77,25 @@ export default function Dashboard() {
             if (expenseRes.error) throw expenseRes.error;
 
             // 3. Aggregate Data
+            // Recall: safeAdd handles floats correctly to 2 decimal places
 
             // SELL STATS (DB 'total' is Grand Total)
             const sellData = sellRes.data || [];
-            const sellGST = sellData.reduce((s, i) => s + (Number(i.gst) || 0), 0);
-            const sellGrandTotal = sellData.reduce((s, i) => s + (Number(i.total) || 0), 0);
-            const sellTaxable = sellGrandTotal - sellGST;
+            const sellGST = sellData.reduce((s, i) => safeAdd(s, i.gst), 0);
+            const sellGrandTotal = sellData.reduce((s, i) => safeAdd(s, i.total), 0);
+            const sellTaxable = safeSubtract(sellGrandTotal, sellGST);
 
             // PURCHASE STATS (DB 'total' is Taxable Amount in Purchase, GST is separate)
-            // Correction: In Purchase.jsx save logic: total = subtotal (taxable), gst = gstAmount.
             const purData = purchaseRes.data || [];
-            const purTaxable = purData.reduce((s, i) => s + (Number(i.total) || 0), 0);
-            const purGST = purData.reduce((s, i) => s + (Number(i.gst) || 0), 0);
-            const purGrandTotal = purTaxable + purGST;
+            const purTaxable = purData.reduce((s, i) => safeAdd(s, i.total), 0);
+            const purGST = purData.reduce((s, i) => safeAdd(s, i.gst), 0);
+            const purGrandTotal = safeAdd(purTaxable, purGST);
 
             // EXPENSE STATS
             const expData = expenseRes.data || [];
-            const expTaxable = expData.reduce((s, i) => s + (Number(i.amount) || 0), 0);
-            const expGST = expData.reduce((s, i) => s + (Number(i.gst) || 0), 0);
-            const expGrandTotal = expTaxable + expGST;
+            const expTaxable = expData.reduce((s, i) => safeAdd(s, i.amount), 0);
+            const expGST = expData.reduce((s, i) => safeAdd(s, i.gst), 0);
+            const expGrandTotal = safeAdd(expTaxable, expGST);
 
             setStats({
                 sales: { count: sellData.length, amount: sellTaxable, gst: sellGST, total: sellGrandTotal },
@@ -128,6 +120,7 @@ export default function Dashboard() {
                         </span>
                         <p className="text-gray-500 text-sm font-bold uppercase tracking-wider">{title}</p>
                     </div>
+                    {/* Total formatted with decimals */}
                     <h3 className="text-3xl font-bold text-gray-800 mt-2">{formatCurrency(data.total)}</h3>
                 </div>
                 <div className="text-right">
